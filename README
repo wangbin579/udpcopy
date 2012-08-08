@@ -1,0 +1,44 @@
+Name:
+    udpcopy
+    It is an online UDP duplication tool and can be used for testing
+
+
+Description:
+    It can help you find bugs without deploying your server software on your production servers.It can also be used to do smoke testing against your products.
+
+
+Scenarios:
+    1) Distributed stress testing
+       Use udpcopy to copy real-world data to stress test your server software. Bugs that only can be produced in high-stress situations can be found.
+
+    2) Hot backup
+
+    3) Online testing
+       Prove the new system is stable and find bugs that only occur in the real world.
+
+    4) Benchmark
+
+
+Usage:
+    1) Install
+       a) download the source code from github:
+          git clone http://github.com/wangbin579/udpcopy
+       b) sh autogen.sh
+       c) ./configure
+       d) make
+       e) make install
+
+    2) Run:
+       a) on the source host (root privilege is required):
+          ./tcpcopy -x local_port-remote_ip:remote_port 
+ 
+       b) on the target host 
+          iptables -I OUTPUT -p tcp --sport port -j QUEUE # if not set
+
+Note:
+    1) It is tested on Linux only (kernal 2.6 or above).
+    2) Udpcopy may lose packets hence lose requests.
+    3) Udpcopy is single-threaded now.
+    4) Root privilege is required.
+    5) Check error.log if you encounter some problems and feel free to report it to us(wangbin579@gmail.com).
+
