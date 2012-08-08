@@ -13,6 +13,5 @@ ltmain.sh
 lib*.a
 install-sh
 libtool
-intercept
-tcpcopy
+udpcopy
 stamp-h1
