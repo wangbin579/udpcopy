@@ -95,7 +95,6 @@ bool process(char *packet, int pack_src)
     ip_header->check = csum((unsigned short *)ip_header, size_ip); 
 
     send_len   = send_ip_packet(ip_header, tot_len);
-    printf("send len:%d,tot_len:%d\n",send_len, tot_len);
     if (-1 == send_len) {
         log_info(LOG_ERR, "send to back error,tot_len:%d", tot_len);
         return false;

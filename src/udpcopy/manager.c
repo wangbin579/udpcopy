@@ -466,8 +466,6 @@ int udp_copy_init(tc_event_loop_t *event_loop)
             return FAILURE;
         }
 
-        /* Init output raw socket info */
-        send_init();
         return SUCCESS;
     }else{
 #if (UDPCOPY_OFFLINE)
