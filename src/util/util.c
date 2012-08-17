@@ -142,7 +142,7 @@ do_checksum_math(u_int16_t *data, int len)
 
 void udpcsum(struct iphdr *ip_header, struct udphdr *udp_packet)
 {       
-    unsigned short sum;
+    int            sum;
     uint16_t       len;
 
     udp_packet->check = 0;
@@ -151,9 +151,7 @@ void udpcsum(struct iphdr *ip_header, struct udphdr *udp_packet)
     sum  = do_checksum_math((u_int16_t *)&ip_header->saddr, 8); 
     sum += ntohs(IPPROTO_UDP + len);
     sum += do_checksum_math((u_int16_t *)udp_packet, len);
-    sum  = CHECKSUM_CARRY(sum);
-
-    udp_packet->check = sum;
+    udp_packet->check = CHECKSUM_CARRY(sum);
 
 }  
 
