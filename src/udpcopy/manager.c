@@ -86,7 +86,6 @@ static int dispose_packet(char *recv_buf, int recv_len, int *p_valid_flag)
     int            replica_num;
     char          *packet;
     bool           packet_valid = false;
-    struct udphdr *udp_header;
     struct iphdr  *ip_header;
 
     packet = recv_buf;

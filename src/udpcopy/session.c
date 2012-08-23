@@ -78,7 +78,7 @@ void ip_fragmentation(struct iphdr *ip_header, struct udphdr *udp_header)
     char          tmp_buf[RECV_BUF_SIZE];
     ssize_t       send_len;
     uint16_t      offset, head_len, size_ip, tot_len,
-                  expect_send_len, remainder, payload_len;
+                  remainder, payload_len;
     struct iphdr *tmp_ip_header;
 
     size_ip    = ip_header->ihl << 2;
