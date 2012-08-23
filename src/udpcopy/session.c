@@ -2,6 +2,8 @@
 #include <xcopy.h>
 #include <udpcopy.h>
 
+static uint64_t clt_udp_cnt = 0;
+
 static void
 strace_pack(int level, struct iphdr *ip_header,
         struct udphdr *udp_header)
@@ -61,6 +63,7 @@ bool is_packet_needed(const char *packet)
     if(LOCAL == check_pack_src(&(clt_settings.transfer), 
                 ip_header->daddr, udp_header->dest, CHECK_DEST)){
         is_needed = true;
+        clt_udp_cnt++;
         strace_pack(LOG_DEBUG, ip_header, udp_header);
     }
 
@@ -68,6 +71,71 @@ bool is_packet_needed(const char *packet)
 
 }
 
+
+void ip_fragmentation(struct iphdr *ip_header, struct udphdr *udp_header)
+{
+    int           max_pack_no, index, i;
+    char          tmp_buf[RECV_BUF_SIZE];
+    ssize_t       send_len;
+    uint16_t      offset, head_len, size_ip, tot_len,
+                  expect_send_len, remainder, payload_len;
+    struct iphdr *tmp_ip_header;
+
+    size_ip    = ip_header->ihl << 2;
+    tot_len    = ntohs(ip_header->tot_len);
+    head_len   = size_ip + sizeof(struct udphdr);
+
+    /* dispose the first packet here */
+    memcpy(tmp_buf, (char *)ip_header, size_ip);
+    offset = clt_settings.mtu - size_ip;
+    if (offset % 8 != 0) {
+        offset = offset / 8;
+        offset = offset * 8;
+    }
+    payload_len = offset;
+
+    tmp_ip_header = (struct iphdr *)tmp_buf;
+    tmp_ip_header->frag_off = htons(0x2000);
+
+    index  = size_ip;
+    memcpy(tmp_buf + size_ip, ((char *)ip_header) + index, payload_len);
+    index      = index + payload_len;
+    remainder  = tot_len - size_ip - payload_len;
+    send_len   = send_ip_packet(tmp_ip_header, size_ip + payload_len);
+    if (-1 == send_len) {
+        log_info(LOG_ERR, "send to back error,packet size:%d",
+                size_ip + payload_len);
+        return;
+    }
+
+    max_pack_no = (offset + remainder - 1)/offset - 1;
+
+    for (i = 0; i <= max_pack_no; i++) {
+
+        memcpy(tmp_buf, (char *)ip_header, size_ip);
+
+        tmp_ip_header = (struct iphdr *)tmp_buf;
+        tmp_ip_header->frag_off = htons(offset >> 3);
+
+        if (i == max_pack_no) {
+            payload_len = remainder;
+        }else {
+            tmp_ip_header->frag_off |= htons(IP_MF);
+            remainder = remainder - payload_len;
+        }
+
+        memcpy(tmp_buf + size_ip, ((char *)ip_header) + index, payload_len);
+        index     = index + payload_len;
+        offset    = offset + payload_len;
+
+        send_len  = send_ip_packet(tmp_ip_header, size_ip + payload_len);
+        if (-1 == send_len) {
+            log_info(LOG_ERR, "send to back error,cont len:%d",
+                    size_ip + payload_len);
+            return;
+        }
+    }
+}
 
 /*
  * The main procedure for processing the filtered packets
@@ -80,7 +148,7 @@ bool process(char *packet, int pack_src)
     struct udphdr           *udp_header;
     ip_port_pair_mapping_t  *test;
 
-    ip_header  = (struct iphdr*)packet;
+    ip_header  = (struct iphdr *)packet;
     size_ip    = ip_header->ihl<<2;
     tot_len    = ntohs(ip_header->tot_len);
     udp_header = (struct udphdr*)((char *)ip_header + size_ip);
@@ -94,10 +162,15 @@ bool process(char *packet, int pack_src)
     ip_header->check = 0;
     ip_header->check = csum((unsigned short *)ip_header, size_ip); 
 
-    send_len   = send_ip_packet(ip_header, tot_len);
-    if (-1 == send_len) {
-        log_info(LOG_ERR, "send to back error,tot_len:%d", tot_len);
-        return false;
+    /* check if it needs fragmentation */
+    if (tot_len > clt_settings.mtu) {
+        ip_fragmentation(ip_header, udp_header);
+    } else {
+        send_len   = send_ip_packet(ip_header, tot_len);
+        if (-1 == send_len) {
+            log_info(LOG_ERR, "send to back error,tot_len:%d", tot_len);
+            return false;
+        }
     }
 
     return true;

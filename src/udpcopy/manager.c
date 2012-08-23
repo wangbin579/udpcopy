@@ -3,7 +3,7 @@
 
 
 static int             raw_sock  = -1;
-static uint64_t        event_cnt = 0, raw_packs = 0, valid_raw_packs = 0;
+static uint64_t        event_cnt = 0;
 static uint32_t        localhost;
 #if (UDPCOPY_OFFLINE)
 static bool            read_pcap_over= false;
@@ -83,83 +83,35 @@ static void replicate_packs(char *packet, int length, int replica_num)
 
 static int dispose_packet(char *recv_buf, int recv_len, int *p_valid_flag)
 {
-    int            replica_num, i, last, packet_num, max_payload,
-                   index, payload_len;
-    char          *packet, tmp_buf[RECV_BUF_SIZE];
+    int            replica_num;
+    char          *packet;
     bool           packet_valid = false;
-    uint16_t       id, size_ip, size_udp, tot_len, cont_len, pack_len, head_len;
     struct udphdr *udp_header;
     struct iphdr  *ip_header;
 
     packet = recv_buf;
     if (is_packet_needed((const char *)packet)){
         replica_num = clt_settings.replica_num;
-        packet_num = 1;
         ip_header   = (struct iphdr*)packet;
         if (localhost == ip_header->saddr){
             if (0 != clt_settings.lo_tf_ip){
                 ip_header->saddr = clt_settings.lo_tf_ip;
             }
         }
-        /* 
-         * If packet length larger than MTU, then we split it. 
-         * This is to solve the ip fragmentation problem
-         */
-        if (recv_len > clt_settings.mtu){
-            /* Calculate number of packets */
-            size_ip     = ip_header->ihl << 2;
-            tot_len     = ntohs(ip_header -> tot_len);
-            if (tot_len != recv_len){
-                log_info(LOG_WARN, "packet len:%u, recv len:%u",
-                        tot_len, recv_len);
-                return FAILURE;
-            }
-            udp_header  = (struct udphdr*)((char *)ip_header + size_ip);
-            size_udp    = ntohs(udp_header->len);
-            cont_len    = size_udp - sizeof(struct udphdr);
-            head_len    = size_ip + sizeof(struct udphdr);
-            max_payload = clt_settings.mtu - head_len;
-            packet_num  = (cont_len + max_payload - 1)/max_payload;
-            last        = packet_num - 1;
-            id          = ip_header->id;
-            tc_log_debug1(LOG_INFO, "recv:%d, more than MTU", recv_len);
-            index = head_len;
-            for (i = 0 ; i < packet_num; i++){
-                if (i != last){
-                    pack_len = clt_settings.mtu;
-                }else{
-                    pack_len += (cont_len - packet_num * max_payload);
-                }
-                payload_len = pack_len - head_len; 
-                udp_header->len    = htons(pack_len - size_ip);
-                ip_header->tot_len = htons(pack_len);
-                ip_header->id = id++;
-                /* Copy header here */
-                memcpy(tmp_buf, recv_buf, head_len);
-                /* Copy payload here */
-                memcpy(tmp_buf + head_len, recv_buf + index, payload_len);
-                index = index + payload_len;
-                if (replica_num > 1){
-                    packet_valid = process_packet(true, tmp_buf, pack_len);
-                    replicate_packs(tmp_buf, pack_len, replica_num);
-                }else{
-                    packet_valid = process_packet(false, tmp_buf, pack_len);
-                }
-            }
+        if (replica_num > 1){
+            packet_valid = process_packet(true, packet, recv_len);
+            replicate_packs(packet, recv_len, replica_num);
         }else{
-            if (replica_num > 1){
-                packet_valid = process_packet(true, packet, recv_len);
-                replicate_packs(packet, recv_len, replica_num);
-            }else{
-                packet_valid = process_packet(false, packet, recv_len);
-            }
+            packet_valid = process_packet(false, packet, recv_len);
         }
     }
+
     if (packet_valid){
         *p_valid_flag = 1;
     } else {
         *p_valid_flag = 0;
     }
+
     return SUCCESS;
 }
 
@@ -186,7 +138,6 @@ static int retrieve_raw_sockets(int sock)
             log_info(LOG_ERR, "recv len is 0");
             break;
         }
-        raw_packs++;
         if (recv_len > RECV_BUF_SIZE){
             log_info(LOG_ERR, "recv_len:%d ,it is too long", recv_len);
             break;
@@ -195,14 +146,7 @@ static int retrieve_raw_sockets(int sock)
         if (FAILURE == dispose_packet(recv_buf, recv_len, &p_valid_flag)){
             break;
         }
-        if (p_valid_flag){
-            valid_raw_packs++;
-        }
 
-        if (raw_packs%100000 == 0){
-            log_info(LOG_NOTICE, "raw packets:%llu, valid :%llu",
-                    raw_packs, valid_raw_packs);
-        }
     }
     return 0;
 }
@@ -353,7 +297,6 @@ void send_packets_from_pcap(int first)
                     dispose_packet((char*)ip_data, ip_pack_len, &p_valid_flag);
                     if (p_valid_flag){
                         tc_log_debug0(LOG_DEBUG, "valid flag for packet");
-                        valid_raw_packs++;
                         if (first){
                             first_pack_time = pkt_hdr.ts;
                             first = 0;
