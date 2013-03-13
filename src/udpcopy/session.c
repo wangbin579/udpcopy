@@ -2,7 +2,11 @@
 #include <xcopy.h>
 #include <udpcopy.h>
 
-static uint64_t clt_udp_cnt = 0;
+
+static time_t   last_record_time = 0;
+
+static uint64_t clt_udp_cnt      = 0;
+static uint64_t clt_udp_send_cnt = 0;
 
 static void
 strace_pack(int level, struct iphdr *ip_header,
@@ -28,7 +32,7 @@ strace_pack(int level, struct iphdr *ip_header,
 }
 
 /*
- * Filter packets 
+ * filter packets 
  */
 bool is_packet_needed(const char *packet)
 {
@@ -39,7 +43,7 @@ bool is_packet_needed(const char *packet)
 
     ip_header = (struct iphdr*)packet;
 
-    /* Check if it is a udp packet */
+    /* check if it is a udp packet */
     if(ip_header->protocol != IPPROTO_UDP){
         return is_needed;
     }
@@ -59,7 +63,7 @@ bool is_packet_needed(const char *packet)
         return is_needed;
     }
 
-    /* Here we filter the packets we do care about */
+    /* filter the packets we do care about */
     if(LOCAL == check_pack_src(&(clt_settings.transfer), 
                 ip_header->daddr, udp_header->dest, CHECK_DEST)){
         is_needed = true;
@@ -108,6 +112,8 @@ void ip_fragmentation(struct iphdr *ip_header, struct udphdr *udp_header)
         return;
     }
 
+    clt_udp_send_cnt++;
+
     max_pack_no = (offset + remainder - 1)/offset - 1;
 
     for (i = 0; i <= max_pack_no; i++) {
@@ -134,19 +140,35 @@ void ip_fragmentation(struct iphdr *ip_header, struct udphdr *udp_header)
                     size_ip + payload_len);
             return;
         }
+        clt_udp_send_cnt++;
     }
 }
 
 /*
- * The main procedure for processing the filtered packets
+ * the main procedure for processing the filtered packets
  */
 bool process(char *packet, int pack_src)
 {
+    int                      diff;
+    time_t                   cur_time;
     ssize_t                  send_len;
     uint16_t                 size_ip, tot_len;
     struct iphdr            *ip_header;
     struct udphdr           *udp_header;
     ip_port_pair_mapping_t  *test;
+
+    /* TODO time update will be optimized later */
+    cur_time   = time(0);
+    if (last_record_time != 0) {
+        diff = cur_time - last_record_time;
+        if (diff > 3) {
+            log_info(LOG_INFO, "udp packets captured:%llu,packets sent:%llu",
+                    clt_udp_cnt, clt_udp_send_cnt);
+            last_record_time = cur_time;
+        }
+    } else {
+        last_record_time = cur_time;
+    }
 
     ip_header  = (struct iphdr *)packet;
     size_ip    = ip_header->ihl<<2;
@@ -171,6 +193,7 @@ bool process(char *packet, int pack_src)
             log_info(LOG_ERR, "send to back error,tot_len:%d", tot_len);
             return false;
         }
+        clt_udp_send_cnt++;
     }
 
     return true;

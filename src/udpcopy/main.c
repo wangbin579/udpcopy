@@ -241,7 +241,6 @@ static int retrieve_target_addresses(char *raw_transfer,
     return 0;
 }
 
-/* TODO It has to solve the sigignore warning problem */
 static int sigignore(int sig) 
 {    
     struct sigaction sa;
