@@ -176,7 +176,7 @@ bool process(char *packet, int pack_src)
     udp_header = (struct udphdr*)((char *)ip_header + size_ip);
 
     test = get_test_pair(&(clt_settings.transfer),
-            ip_header->saddr, udp_header->source);
+            ip_header->daddr, udp_header->dest);
     ip_header->daddr = test->target_ip;
     udp_header->dest = test->target_port;
 
