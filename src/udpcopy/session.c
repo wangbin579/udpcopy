@@ -81,13 +81,12 @@ void ip_fragmentation(struct iphdr *ip_header, struct udphdr *udp_header)
     int           max_pack_no, index, i;
     char          tmp_buf[RECV_BUF_SIZE];
     ssize_t       send_len;
-    uint16_t      offset, head_len, size_ip, tot_len,
+    uint16_t      offset, size_ip, tot_len,
                   remainder, payload_len;
     struct iphdr *tmp_ip_header;
 
     size_ip    = ip_header->ihl << 2;
     tot_len    = ntohs(ip_header->tot_len);
-    head_len   = size_ip + sizeof(struct udphdr);
 
     /* dispose the first packet here */
     memcpy(tmp_buf, (char *)ip_header, size_ip);

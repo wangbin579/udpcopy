@@ -50,8 +50,9 @@ ip_port_pair_mapping_t *get_test_pair(ip_port_pair_mappings_t *transfer,
         uint32_t ip, uint16_t port)
 {
     int i;
-    ip_port_pair_mapping_t *pair;
+    ip_port_pair_mapping_t  *pair = NULL;
     ip_port_pair_mapping_t **mappings;
+
     mappings = transfer->mappings;
     for (i = 0; i < transfer->num; i++){
         pair = mappings[i];
@@ -59,6 +60,7 @@ ip_port_pair_mapping_t *get_test_pair(ip_port_pair_mappings_t *transfer,
             break;
         }
     }
+
     return pair;
 }
 
