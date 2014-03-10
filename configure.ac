@@ -57,7 +57,7 @@ if test "x$enable_offline" = "xyes";then
     LIBS="-lpcap"
 fi
 
-CFLAGS="-g -Wall -pedantic  -I../core -I../event -I../log -I../udpcopy -I../util"
+CFLAGS="-g -std=gnu99 -Wall -pedantic  -I../core -I../event -I../log -I../udpcopy -I../util"
 
 #AC_CONFIG_FILES([Makefile])
 AC_OUTPUT([
